@@ -12,9 +12,10 @@ connection:
       type: string
       required: true
       description: >
-        Splunk server hostname or IP address. For Splunk Enterprise, use your
-        server's hostname or IP. For Splunk Cloud, use your cloud instance URL
-        (e.g., your-instance.splunkcloud.com).
+        Splunk server hostname or IP address (without protocol or port).
+        For Splunk Enterprise, use your server's hostname or IP address.
+        For Splunk Cloud, use your cloud instance URL
+        (e.g., prd-p-xxxxx.splunkcloud.com).
 
     - name: port
       type: integer
@@ -36,8 +37,8 @@ connection:
       type: string
       required: true
       description: >
-        Password for the Splunk user account. Keep this secure and use
-        appropriate access controls.
+        Password for the Splunk user account. Store securely and use appropriate
+        access controls. For production, consider using Databricks secrets.
 
     - name: verify_ssl
       type: boolean
@@ -45,7 +46,8 @@ connection:
       description: >
         Whether to verify SSL certificates when connecting to Splunk. Defaults
         to false. Set to true in production environments with valid SSL
-        certificates. Use false for development or self-signed certificates.
+        certificates. Use false for development or when using self-signed
+        certificates.
 
 # ============================================================================
 # External Options Allowlist
@@ -54,4 +56,7 @@ connection:
 # Use a comma-separated string of option names.
 # If no table-specific options are needed, set to empty string or omit.
 # ============================================================================
-external_options_allowlist: "index,metric_name,dimension,dimension_value,app,earliest_time,latest_time,search_query"
+# NOTE: Currently empty because the connector does not yet use table_options.
+# Future enhancements will add filtering options for: index, metric_name,
+# dimension, dimension_value, app, earliest_time, latest_time, search_query
+external_options_allowlist: ""
