@@ -1,0 +1,57 @@
+# splunk Community Connector Spec
+# This file defines the specification for the connector including
+# connection parameters and allowlist options.
+
+# ============================================================================
+# Connection Parameters
+# These are provided when creating the Unity Catalog connection.
+# ============================================================================
+connection:
+  parameters:
+    - name: host
+      type: string
+      required: true
+      description: >
+        Splunk server hostname or IP address. For Splunk Enterprise, use your
+        server's hostname or IP. For Splunk Cloud, use your cloud instance URL
+        (e.g., your-instance.splunkcloud.com).
+
+    - name: port
+      type: integer
+      required: false
+      description: >
+        Splunk management port for REST API access. Defaults to 8089 if not
+        specified. The standard management port is 8089 for most Splunk
+        installations.
+
+    - name: username
+      type: string
+      required: true
+      description: >
+        Splunk username with appropriate permissions for API access. The user
+        must have the 'list_metrics_catalog' capability assigned through a role
+        to access metrics catalog endpoints.
+
+    - name: password
+      type: string
+      required: true
+      description: >
+        Password for the Splunk user account. Keep this secure and use
+        appropriate access controls.
+
+    - name: verify_ssl
+      type: boolean
+      required: false
+      description: >
+        Whether to verify SSL certificates when connecting to Splunk. Defaults
+        to false. Set to true in production environments with valid SSL
+        certificates. Use false for development or self-signed certificates.
+
+# ============================================================================
+# External Options Allowlist
+# These table-specific options must be included in the externalOptionsAllowList
+# parameter of the UC connection to allow them to be passed through.
+# Use a comma-separated string of option names.
+# If no table-specific options are needed, set to empty string or omit.
+# ============================================================================
+external_options_allowlist: "index,metric_name,dimension,dimension_value,app,earliest_time,latest_time,search_query"
