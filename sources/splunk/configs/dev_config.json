@@ -1,8 +1,8 @@
 {
-  "host": "https://prd-p-gur5l.splunkcloud.com",
+  "host": "https://changeme.splunkcloud.com",
   "port": 8089,
-  "username": "sc_admin",
-  "password": "ATsplunk2025!",
+  "username": "",
+  "password": "",
   "verify_ssl": false
 }
 
