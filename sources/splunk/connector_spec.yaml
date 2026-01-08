@@ -37,8 +37,8 @@ connection:
       type: string
       required: true
       description: >
-        Password for the Splunk user account. Keep this secure and use
-        appropriate access controls.
+        Password for the Splunk user account. Store securely and use appropriate
+        access controls. For production, consider using Databricks secrets.
 
     - name: verify_ssl
       type: boolean
@@ -46,7 +46,8 @@ connection:
       description: >
         Whether to verify SSL certificates when connecting to Splunk. Defaults
         to false. Set to true in production environments with valid SSL
-        certificates. Use false for development or self-signed certificates.
+        certificates. Use false for development or when using self-signed
+        certificates.
 
 # ============================================================================
 # External Options Allowlist
