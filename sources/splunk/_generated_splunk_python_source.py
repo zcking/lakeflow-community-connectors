@@ -261,7 +261,7 @@ def register_lakeflow_source(spark):
                 "members": StructType(
                     [
                         StructField("id", StringType(), False),
-                        StructField("organizationId", StringType(), False),
+                        StructField("organizationId", StringType(), True),
                         StructField("name", StringType(), True),
                         StructField("email", StringType(), True),
                         StructField("fullName", StringType(), True),
