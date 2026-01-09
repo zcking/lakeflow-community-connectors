@@ -63,6 +63,7 @@ class LakeflowConnect:
             "members": StructType(
                 [
                     StructField("id", StringType(), False),
+                    StructField("organizationId", StringType(), False),
                     StructField("name", StringType(), True),
                     StructField("email", StringType(), True),
                     StructField("fullName", StringType(), True),
@@ -70,6 +71,10 @@ class LakeflowConnect:
                     StructField("lastUpdated", LongType(), True),
                     StructField("admin", BooleanType(), True),
                     StructField("readOnly", BooleanType(), True),
+                    StructField("creator", BooleanType(), True),
+                    StructField("description", BooleanType(), True),
+                    StructField("title", BooleanType(), True),
+                    StructField("roles", BooleanType(), True),
                 ]
             ),
         }
@@ -181,6 +186,10 @@ class LakeflowConnect:
                 "lastUpdated": member.get("lastUpdated"),
                 "admin": member.get("admin", False),
                 "readOnly": member.get("readOnly", False),
+                "creator": member.get("creator", False),
+                "description": member.get("description", False),
+                "title": member.get("title", False),
+                "roles": member.get("roles", False),
             }
             all_records.append(record)
 
