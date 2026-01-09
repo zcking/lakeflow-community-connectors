@@ -233,6 +233,25 @@ class LakeflowConnect:
             count = data.get("count", len(members)) if isinstance(data, dict) else len(members)
 
             for member in members:
+                # Extract role titles and descriptions from roles array
+                roles = member.get("roles", [])
+                role_titles = []
+                role_descriptions = []
+                
+                if isinstance(roles, list):
+                    for role in roles:
+                        if isinstance(role, dict):
+                            role_title = role.get("title")
+                            role_desc = role.get("description")
+                            if role_title:
+                                role_titles.append(role_title)
+                            if role_desc:
+                                role_descriptions.append(role_desc)
+                
+                # Join multiple roles with comma
+                title_description = ",".join(role_titles) if role_titles else None
+                role_description = ",".join(role_descriptions) if role_descriptions else None
+                
                 record = {
                     "id": member.get("id"),
                     "organizationId": member.get("organizationId"),
@@ -245,8 +264,8 @@ class LakeflowConnect:
                     "creator": member.get("creator"),
                     "title": member.get("title"),
                     "roles": member.get("roles"),
-                    "title_description": member.get("roles.title"),
-                    "role_description": member.get("roles.description"),
+                    "title_description": title_description,
+                    "role_description": role_description,
                 }
                 all_records.append(record)
 
