@@ -44,9 +44,9 @@ class LakeflowConnect:
         Returns a list of available tables from the SignalFx API.
 
         Returns:
-            List of table names: members, teams
+            List of table names: members, teams, dashboards
         """
-        return ["members", "teams"]
+        return ["members", "teams", "dashboards"]
 
     def get_table_schema(self, table_name: str, table_options: dict[str, str] = {}) -> StructType:
         """
@@ -88,6 +88,19 @@ class LakeflowConnect:
                     StructField("creator", StringType(), True),
                 ]
             ),
+            "dashboards": StructType(
+                [
+                    StructField("id", StringType(), False),
+                    StructField("name", StringType(), True),
+                    StructField("description", StringType(), True),
+                    StructField("created", LongType(), True),
+                    StructField("lastUpdated", LongType(), True),
+                    StructField("creator", StringType(), True),
+                    StructField("groupId", StringType(), True),
+                    StructField("tags", StringType(), True),
+                    StructField("eventOverlays", StringType(), True),
+                ]
+            ),
         }
 
         if table_name not in schemas:
@@ -116,6 +129,10 @@ class LakeflowConnect:
                 "primary_keys": ["id"],
                 "ingestion_type": "snapshot",
             },
+            "dashboards": {
+                "primary_keys": ["id"],
+                "ingestion_type": "snapshot",
+            },
         }
 
         if table_name not in metadata:
@@ -139,6 +156,8 @@ class LakeflowConnect:
             return self._read_members(start_offset)
         elif table_name == "teams":
             return self._read_teams(start_offset)
+        elif table_name == "dashboards":
+            return self._read_dashboards(start_offset)
         else:
             raise ValueError(f"Table '{table_name}' is not supported.")
 
@@ -241,6 +260,45 @@ class LakeflowConnect:
                 "created": team.get("created"),
                 "lastUpdated": team.get("lastUpdated"),
                 "creator": team.get("creator"),
+            }
+            all_records.append(record)
+
+        # For snapshot tables, return completed offset
+        return iter(all_records), {"completed": True}
+
+    def _read_dashboards(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+        """
+        Read dashboards from SignalFx API.
+
+        Args:
+            start_offset: Offset containing pagination info (not used for full refresh)
+
+        Returns:
+            Iterator of dashboard records and next offset
+        """
+        all_records = []
+
+        # Call the SignalFx dashboards API endpoint
+        data = self._make_request("/v2/dashboard")
+        
+        # The API returns a list of dashboard objects
+        dashboards = data if isinstance(data, list) else data.get("results", [])
+
+        for dashboard in dashboards:
+            # Convert tags list to comma-separated string if present
+            tags = dashboard.get("tags", [])
+            tags_str = ",".join(tags) if isinstance(tags, list) else tags
+            
+            record = {
+                "id": dashboard.get("id"),
+                "name": dashboard.get("name"),
+                "description": dashboard.get("description"),
+                "created": dashboard.get("created"),
+                "lastUpdated": dashboard.get("lastUpdated"),
+                "creator": dashboard.get("creator"),
+                "groupId": dashboard.get("groupId"),
+                "tags": dashboard.get("tags"),
+                "eventOverlays": dashboard.get("eventOverlays"),
             }
             all_records.append(record)
 

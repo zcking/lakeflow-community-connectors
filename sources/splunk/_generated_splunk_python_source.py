@@ -242,9 +242,9 @@ def register_lakeflow_source(spark):
             Returns a list of available tables from the SignalFx API.
 
             Returns:
-                List of table names: members, teams
+                List of table names: members, teams, dashboards
             """
-            return ["members", "teams"]
+            return ["members", "teams", "dashboards"]
 
         def get_table_schema(self, table_name: str, table_options: dict[str, str] = {}) -> StructType:
             """
@@ -262,17 +262,17 @@ def register_lakeflow_source(spark):
                     [
                         StructField("id", StringType(), False),
                         StructField("organizationId", StringType(), True),
-                        StructField("name", StringType(), True),
-                        StructField("email", StringType(), True),
                         StructField("fullName", StringType(), True),
+                        StructField("email", StringType(), True),
                         StructField("created", LongType(), True),
                         StructField("lastUpdated", LongType(), True),
                         StructField("admin", BooleanType(), True),
                         StructField("readOnly", BooleanType(), True),
-                        StructField("creator", BooleanType(), True),
-                        StructField("description", BooleanType(), True),
-                        StructField("title", BooleanType(), True),
-                        StructField("roles", BooleanType(), True),
+                        StructField("creator", StringType(), True),
+                        StructField("title", StringType(), True),
+                        StructField("roles", StringType(), True),
+                        StructField("title_description", StringType(), True),
+                        StructField("role_description", StringType(), True),
                     ]
                 ),
                 "teams": StructType(
@@ -284,6 +284,19 @@ def register_lakeflow_source(spark):
                         StructField("created", LongType(), True),
                         StructField("lastUpdated", LongType(), True),
                         StructField("creator", StringType(), True),
+                    ]
+                ),
+                "dashboards": StructType(
+                    [
+                        StructField("id", StringType(), False),
+                        StructField("name", StringType(), True),
+                        StructField("description", StringType(), True),
+                        StructField("created", LongType(), True),
+                        StructField("lastUpdated", LongType(), True),
+                        StructField("creator", StringType(), True),
+                        StructField("groupId", StringType(), True),
+                        StructField("tags", StringType(), True),
+                        StructField("eventOverlays", StringType(), True),
                     ]
                 ),
             }
@@ -314,6 +327,10 @@ def register_lakeflow_source(spark):
                     "primary_keys": ["id"],
                     "ingestion_type": "snapshot",
                 },
+                "dashboards": {
+                    "primary_keys": ["id"],
+                    "ingestion_type": "snapshot",
+                },
             }
 
             if table_name not in metadata:
@@ -337,6 +354,8 @@ def register_lakeflow_source(spark):
                 return self._read_members(start_offset)
             elif table_name == "teams":
                 return self._read_teams(start_offset)
+            elif table_name == "dashboards":
+                return self._read_dashboards(start_offset)
             else:
                 raise ValueError(f"Table '{table_name}' is not supported.")
 
@@ -394,17 +413,18 @@ def register_lakeflow_source(spark):
             for member in members:
                 record = {
                     "id": member.get("id"),
-                    "name": member.get("name"),
-                    "email": member.get("email"),
+                    "organizationId": member.get("organizationId"),
                     "fullName": member.get("fullName"),
+                    "email": member.get("email"),
                     "created": member.get("created"),
                     "lastUpdated": member.get("lastUpdated"),
                     "admin": member.get("admin", False),
                     "readOnly": member.get("readOnly", False),
-                    "creator": member.get("creator", False),
-                    "description": member.get("description", False),
-                    "title": member.get("title", False),
-                    "roles": member.get("roles", False),
+                    "creator": member.get("creator"),
+                    "title": member.get("title"),
+                    "roles": member.get("roles"),
+                    "title_description": member.get("roles.title"),
+                    "role_description": member.get("roles.description"),
                 }
                 all_records.append(record)
 
@@ -438,6 +458,44 @@ def register_lakeflow_source(spark):
                     "created": team.get("created"),
                     "lastUpdated": team.get("lastUpdated"),
                     "creator": team.get("creator"),
+                }
+                all_records.append(record)
+
+            # For snapshot tables, return completed offset
+            return iter(all_records), {"completed": True}
+
+        def _read_dashboards(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+            """
+            Read dashboards from SignalFx API.
+
+            Args:
+                start_offset: Offset containing pagination info (not used for full refresh)
+
+            Returns:
+                Iterator of dashboard records and next offset
+            """
+            all_records = []
+
+            # Call the SignalFx dashboards API endpoint
+            data = self._make_request("/v2/dashboard")
+
+            # The API returns a list of dashboard objects
+            dashboards = data if isinstance(data, list) else data.get("results", [])
+
+            for dashboard in dashboards:
+                # Convert tags list to comma-separated string if present
+                tags = dashboard.get("tags", [])
+                tags_str = ",".join(tags) if isinstance(tags, list) else tags
+
+                record = {
+                    "id": dashboard.get("id"),
+                    "name": dashboard.get("name"),
+                    "description": dashboard.get("description"),
+                    "created": dashboard.get("created"),
+                    "lastUpdated": dashboard.get("lastUpdated"),
+                    "creator": dashboard.get("creator"),
+                    "groupId": dashboard.get("groupId"),
+                    "tags": tags_str,
                 }
                 all_records.append(record)
 
