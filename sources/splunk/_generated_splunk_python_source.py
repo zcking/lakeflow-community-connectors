@@ -12,7 +12,6 @@ import json
 
 from pyspark.sql import Row
 from pyspark.sql.datasource import DataSource, DataSourceReader, SimpleDataSourceStreamReader
-from requests.auth import HTTPBasicAuth
 from pyspark.sql.types import *
 import base64
 import requests
@@ -210,106 +209,104 @@ def register_lakeflow_source(spark):
 
     class LakeflowConnect:
         """
-        Splunk Metrics Catalog connector for Lakeflow.
-        Retrieves metrics, dimensions, dimension values, and rollup policies from Splunk REST API.
+        SignalFx connector for Lakeflow.
+        Retrieves organization members from SignalFx API.
         """
 
         def __init__(self, options: dict) -> None:
             """
-            Initialize the Splunk connector with connection parameters.
+            Initialize the SignalFx connector with connection parameters.
 
             Args:
                 options: Dictionary containing:
-                    - host: Splunk server hostname or IP address
-                    - port: Splunk management port (default: 8089)
-                    - username: Splunk username with appropriate permissions
-                    - password: Splunk password
-                    - verify_ssl: Whether to verify SSL certificates (default: False)
+                    - api_token: SignalFx API token for authentication
+                    - base_url: SignalFx API base URL (default: https://api.us1.signalfx.com)
             """
-            self.host = options.get("host")
-            self.port = options.get("port", 8089)
-            self.username = options.get("username")
-            self.password = options.get("password")
-            self.verify_ssl = options.get("verify_ssl", "false").lower() == "true" if isinstance(
-                options.get("verify_ssl"), str
-            ) else options.get("verify_ssl", False)
+            self.api_token = options.get("api_token")
+            self.base_url = options.get("base_url", "https://api.us1.signalfx.com")
 
-            if not self.host:
-                raise ValueError("Missing required option: 'host'")
-            if not self.username:
-                raise ValueError("Missing required option: 'username'")
-            if not self.password:
-                raise ValueError("Missing required option: 'password'")
+            if not self.api_token:
+                raise ValueError("Missing required option: 'api_token'")
 
-            self.base_url = f"https://{self.host}:{self.port}"
-            self.auth = HTTPBasicAuth(self.username, self.password)
+            # Set up headers for authentication
+            self.headers = {
+                "X-SF-TOKEN": self.api_token,
+                "Content-Type": "application/json"
+            }
 
             # Default page size for pagination
             self.page_size = 100
 
         def list_tables(self) -> list[str]:
             """
-            Returns a list of available tables from the Splunk Metrics Catalog.
+            Returns a list of available tables from the SignalFx API.
 
             Returns:
-                List of table names: metrics, dimensions, rollup_policies
+                List of table names: members, teams, dashboards, metrics
             """
-            return ["metrics", "dimensions", "rollup_policies"]
+            return ["members", "teams", "dashboards", "metrics"]
 
-        def get_table_schema(self, table_name: str) -> StructType:
+        def get_table_schema(self, table_name: str, table_options: dict[str, str] = {}) -> StructType:
             """
             Fetch the schema of a table.
 
             Args:
                 table_name: The name of the table to fetch the schema for.
+                table_options: Additional options for the table.
 
             Returns:
                 A StructType object representing the schema of the table.
             """
             schemas = {
+                "members": StructType(
+                    [
+                        StructField("id", StringType(), False),
+                        StructField("organizationId", StringType(), True),
+                        StructField("fullName", StringType(), True),
+                        StructField("email", StringType(), True),
+                        StructField("created", LongType(), True),
+                        StructField("lastUpdated", LongType(), True),
+                        StructField("admin", BooleanType(), True),
+                        StructField("readOnly", BooleanType(), True),
+                        StructField("creator", StringType(), True),
+                        StructField("title", StringType(), True),
+                        StructField("roles", StringType(), True),
+                        StructField("title_description", StringType(), True),
+                        StructField("role_description", StringType(), True),
+                    ]
+                ),
+                "teams": StructType(
+                    [
+                        StructField("id", StringType(), False),
+                        StructField("name", StringType(), True),
+                        StructField("members", StringType(), True),
+                        StructField("description", StringType(), True),
+                        StructField("created", LongType(), True),
+                        StructField("lastUpdated", LongType(), True),
+                        StructField("creator", StringType(), True),
+                    ]
+                ),
+                "dashboards": StructType(
+                    [
+                        StructField("id", StringType(), False),
+                        StructField("name", StringType(), True),
+                        StructField("description", StringType(), True),
+                        StructField("created", LongType(), True),
+                        StructField("lastUpdated", LongType(), True),
+                        StructField("creator", StringType(), True),
+                        StructField("groupId", StringType(), True),
+                        StructField("tags", StringType(), True),
+                        StructField("eventOverlays", StringType(), True),
+                    ]
+                ),
                 "metrics": StructType(
                     [
-                        StructField("metric_name", StringType(), False),
-                        StructField("index", StringType(), True),
-                        StructField(
-                            "dimensions",
-                            ArrayType(
-                                StructType(
-                                    [
-                                        StructField("name", StringType(), True),
-                                        StructField("value", StringType(), True),
-                                    ]
-                                )
-                            ),
-                            True,
-                        ),
-                    ]
-                ),
-                "dimensions": StructType(
-                    [
-                        StructField("dimension_name", StringType(), False),
-                    ]
-                ),
-                "rollup_policies": StructType(
-                    [
-                        StructField("index", StringType(), False),
-                        StructField("defaultAggregation", StringType(), True),
-                        StructField("metricList", StringType(), True),
-                        StructField("metricListType", StringType(), True),
-                        StructField("dimensionList", StringType(), True),
-                        StructField("dimensionListType", StringType(), True),
-                        StructField(
-                            "summaries",
-                            ArrayType(
-                                StructType(
-                                    [
-                                        StructField("rollupIndex", StringType(), True),
-                                        StructField("span", StringType(), True),
-                                    ]
-                                )
-                            ),
-                            True,
-                        ),
+                        StructField("name", StringType(), False),
+                        StructField("type", StringType(), True),
+                        StructField("description", StringType(), True),
+                        StructField("created", LongType(), True),
+                        StructField("lastUpdated", LongType(), True),
+                        StructField("creator", StringType(), True),
                     ]
                 ),
             }
@@ -319,28 +316,33 @@ def register_lakeflow_source(spark):
 
             return schemas[table_name]
 
-        def read_table_metadata(self, table_name: str) -> dict:
+        def read_table_metadata(self, table_name: str, table_options: dict[str, str] = {}) -> dict:
             """
             Fetch the metadata of a table.
 
             Args:
                 table_name: The name of the table to fetch the metadata for.
+                table_options: Additional options for the table.
 
             Returns:
-                A dictionary containing primary_key and ingestion_type.
-                All Splunk Metrics Catalog tables use snapshot ingestion.
+                A dictionary containing primary_keys and ingestion_type.
+                SignalFx members use snapshot ingestion.
             """
             metadata = {
+                "members": {
+                    "primary_keys": ["id"],
+                    "ingestion_type": "snapshot",
+                },
+                "teams": {
+                    "primary_keys": ["id"],
+                    "ingestion_type": "snapshot",
+                },
+                "dashboards": {
+                    "primary_keys": ["id"],
+                    "ingestion_type": "snapshot",
+                },
                 "metrics": {
-                    "primary_key": "metric_name",
-                    "ingestion_type": "snapshot",
-                },
-                "dimensions": {
-                    "primary_key": "dimension_name",
-                    "ingestion_type": "snapshot",
-                },
-                "rollup_policies": {
-                    "primary_key": "index",
+                    "primary_keys": ["name"],
                     "ingestion_type": "snapshot",
                 },
             }
@@ -350,29 +352,32 @@ def register_lakeflow_source(spark):
 
             return metadata[table_name]
 
-        def read_table(self, table_name: str, start_offset: dict) -> tuple[Iterator[dict], dict]:
+        def read_table(self, table_name: str, start_offset: dict, table_options: dict[str, str] = {}) -> tuple[Iterator[dict], dict]:
             """
             Read the records of a table and return an iterator of records and an offset.
 
             Args:
                 table_name: The name of the table to read.
                 start_offset: The offset to start reading from.
+                table_options: Additional options for the table.
 
             Returns:
                 An iterator of records in JSON format and an offset dictionary.
             """
-            if table_name == "metrics":
+            if table_name == "members":
+                return self._read_members(start_offset)
+            elif table_name == "teams":
+                return self._read_teams(start_offset)
+            elif table_name == "dashboards":
+                return self._read_dashboards(start_offset)
+            elif table_name == "metrics":
                 return self._read_metrics(start_offset)
-            elif table_name == "dimensions":
-                return self._read_dimensions(start_offset)
-            elif table_name == "rollup_policies":
-                return self._read_rollup_policies(start_offset)
             else:
                 raise ValueError(f"Table '{table_name}' is not supported.")
 
         def _make_request(self, endpoint: str, params: dict = None) -> dict:
             """
-            Make a GET request to the Splunk REST API.
+            Make a GET request to the SignalFx API.
 
             Args:
                 endpoint: API endpoint path
@@ -386,221 +391,220 @@ def register_lakeflow_source(spark):
             if params is None:
                 params = {}
 
-            # Always request JSON output
-            params["output_mode"] = "json"
-
             response = requests.get(
                 url,
-                auth=self.auth,
+                headers=self.headers,
                 params=params,
-                verify=self.verify_ssl,
             )
 
             if response.status_code == 401:
-                raise Exception("Splunk API authentication failed. Check username and password.")
+                raise Exception("SignalFx API authentication failed. Check API token.")
             elif response.status_code == 403:
                 raise Exception(
-                    "Splunk API access forbidden. Ensure user has required capabilities "
-                    "(list_metrics_catalog for read operations)."
+                    "SignalFx API access forbidden. Ensure API token has appropriate permissions."
                 )
             elif response.status_code != 200:
-                raise Exception(f"Splunk API error: {response.status_code} {response.text}")
+                raise Exception(f"SignalFx API error: {response.status_code} {response.text}")
 
             return response.json()
 
-        def _read_metrics(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+        def _read_members(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
             """
-            Read metrics from the Splunk Metrics Catalog.
+            Read organization members from SignalFx API with pagination.
 
             Args:
-                start_offset: Offset containing 'offset' key for pagination
+                start_offset: Offset containing pagination info
+
+            Returns:
+                Iterator of member records and next offset
+            """
+            all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
+
+            while True:
+                # Call the SignalFx members API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/organization/member", params)
+
+                # The API returns a list of member objects
+                members = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(members)) if isinstance(data, dict) else len(members)
+
+                for member in members:
+                    # Extract role titles and descriptions from roles array
+                    roles = member.get("roles", [])
+                    role_titles = []
+                    role_descriptions = []
+
+                    if isinstance(roles, list):
+                        for role in roles:
+                            if isinstance(role, dict):
+                                role_title = role.get("title")
+                                role_desc = role.get("description")
+                                if role_title:
+                                    role_titles.append(role_title)
+                                if role_desc:
+                                    role_descriptions.append(role_desc)
+
+                    # Join multiple roles with comma
+                    title_description = ",".join(role_titles) if role_titles else None
+                    role_description = ",".join(role_descriptions) if role_descriptions else None
+
+                    record = {
+                        "id": member.get("id"),
+                        "organizationId": member.get("organizationId"),
+                        "fullName": member.get("fullName"),
+                        "email": member.get("email"),
+                        "created": member.get("created"),
+                        "lastUpdated": member.get("lastUpdated"),
+                        "admin": member.get("admin", False),
+                        "readOnly": member.get("readOnly", False),
+                        "creator": member.get("creator"),
+                        "title": member.get("title"),
+                        "roles": member.get("roles"),
+                        "title_description": title_description,
+                        "role_description": role_description,
+                    }
+                    all_records.append(record)
+
+                # Check if we've fetched all records
+                if not members or len(members) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(members)
+
+            # For snapshot tables, return completed offset
+            return iter(all_records), {"completed": True}
+
+        def _read_teams(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+            """
+            Read teams from SignalFx API with pagination.
+
+            Args:
+                start_offset: Offset containing pagination info
+
+            Returns:
+                Iterator of team records and next offset
+            """
+            all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
+
+            while True:
+                # Call the SignalFx teams API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/team", params)
+
+                # The API returns a list of team objects
+                teams = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(teams)) if isinstance(data, dict) else len(teams)
+
+                for team in teams:
+                    record = {
+                        "id": team.get("id"),
+                        "name": team.get("name"),
+                        "members": team.get("members"),
+                        "description": team.get("description"),
+                        "created": team.get("created"),
+                        "lastUpdated": team.get("lastUpdated"),
+                        "creator": team.get("creator"),
+                    }
+                    all_records.append(record)
+
+                # Check if we've fetched all records
+                if not teams or len(teams) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(teams)
+
+            # For snapshot tables, return completed offset
+            return iter(all_records), {"completed": True}
+
+        def _read_dashboards(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+            """
+            Read dashboards from SignalFx API with pagination.
+
+            Args:
+                start_offset: Offset containing pagination info
+
+            Returns:
+                Iterator of dashboard records and next offset
+            """
+            all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
+
+            while True:
+                # Call the SignalFx dashboards API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/dashboard", params)
+
+                # The API returns a list of dashboard objects
+                dashboards = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(dashboards)) if isinstance(data, dict) else len(dashboards)
+
+                for dashboard in dashboards:
+                    record = {
+                        "id": dashboard.get("id"),
+                        "name": dashboard.get("name"),
+                        "description": dashboard.get("description"),
+                        "created": dashboard.get("created"),
+                        "lastUpdated": dashboard.get("lastUpdated"),
+                        "creator": dashboard.get("creator"),
+                        "groupId": dashboard.get("groupId"),
+                        "tags": dashboard.get("tags"),
+                        "eventOverlays": dashboard.get("eventOverlays"),
+                    }
+                    all_records.append(record)
+
+                # Check if we've fetched all records
+                if not dashboards or len(dashboards) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(dashboards)
+
+            # For snapshot tables, return completed offset
+            return iter(all_records), {"completed": True}
+
+        def _read_metrics(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+            """
+            Read metrics from SignalFx API with pagination.
+
+            Args:
+                start_offset: Offset containing pagination info
 
             Returns:
                 Iterator of metric records and next offset
             """
-            offset = 0
-            if start_offset and "offset" in start_offset:
-                offset = start_offset["offset"]
-
             all_records = []
-            current_offset = offset
+            offset = start_offset.get("offset", 0) if start_offset else 0
 
             while True:
-                params = {
-                    "count": self.page_size,
-                    "offset": current_offset,
-                }
+                # Call the SignalFx metrics API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/metric", params)
 
-                data = self._make_request("/services/catalog/metricstore/metrics", params)
-                entries = data.get("entry", [])
+                # The API returns a list of metric objects
+                metrics = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(metrics)) if isinstance(data, dict) else len(metrics)
 
-                if not entries:
-                    break
-
-                for entry in entries:
-                    content = entry.get("content", {})
-                    record = self._parse_metric_entry(entry, content)
-                    all_records.append(record)
-
-                if len(entries) < self.page_size:
-                    break
-
-                current_offset += self.page_size
-
-            # For snapshot tables, return None offset to indicate completion
-            # or the same offset to signal no more data
-            return iter(all_records), {"offset": current_offset, "completed": True}
-
-        def _parse_metric_entry(self, entry: dict, content: dict) -> dict:
-            """
-            Parse a metric entry from the API response.
-
-            Args:
-                entry: The entry object from the response
-                content: The content object within the entry
-
-            Returns:
-                Parsed metric record
-            """
-            metric_name = entry.get("name") or content.get("metric_name", "")
-            index = content.get("index", None)
-
-            # Parse dimensions if present
-            dimensions = None
-            dims_data = content.get("dimensions")
-            if dims_data and isinstance(dims_data, dict):
-                dimensions = [
-                    {"name": k, "value": str(v) if v is not None else None}
-                    for k, v in dims_data.items()
-                ]
-
-            return {
-                "metric_name": metric_name,
-                "index": index,
-                "dimensions": dimensions,
-            }
-
-        def _read_dimensions(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
-            """
-            Read dimensions from the Splunk Metrics Catalog.
-
-            Args:
-                start_offset: Offset containing 'offset' key for pagination
-
-            Returns:
-                Iterator of dimension records and next offset
-            """
-            offset = 0
-            if start_offset and "offset" in start_offset:
-                offset = start_offset["offset"]
-
-            all_records = []
-            current_offset = offset
-
-            while True:
-                params = {
-                    "count": self.page_size,
-                    "offset": current_offset,
-                }
-
-                data = self._make_request("/services/catalog/metricstore/dimensions", params)
-                entries = data.get("entry", [])
-
-                if not entries:
-                    break
-
-                for entry in entries:
-                    content = entry.get("content", {})
-                    dimension_name = entry.get("name") or content.get("dimension_name", "")
-
+                for metric in metrics:
                     record = {
-                        "dimension_name": dimension_name,
+                        "name": metric.get("name"),
+                        "type": metric.get("type"),
+                        "description": metric.get("description"),
+                        "created": metric.get("created"),
+                        "lastUpdated": metric.get("lastUpdated"),
+                        "creator": metric.get("creator"),
                     }
                     all_records.append(record)
 
-                if len(entries) < self.page_size:
+                # Check if we've fetched all records
+                if not metrics or len(metrics) < self.page_size or len(all_records) >= count:
                     break
 
-                current_offset += self.page_size
+                offset += len(metrics)
 
-            return iter(all_records), {"offset": current_offset, "completed": True}
-
-        def _read_rollup_policies(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
-            """
-            Read rollup policies from the Splunk Metrics Catalog.
-
-            Args:
-                start_offset: Offset containing 'offset' key for pagination
-
-            Returns:
-                Iterator of rollup policy records and next offset
-            """
-            offset = 0
-            if start_offset and "offset" in start_offset:
-                offset = start_offset["offset"]
-
-            all_records = []
-            current_offset = offset
-
-            while True:
-                params = {
-                    "count": self.page_size,
-                    "offset": current_offset,
-                }
-
-                data = self._make_request("/services/catalog/metricstore/rollup", params)
-                entries = data.get("entry", [])
-
-                if not entries:
-                    break
-
-                for entry in entries:
-                    content = entry.get("content", {})
-                    record = self._parse_rollup_entry(entry, content)
-                    all_records.append(record)
-
-                if len(entries) < self.page_size:
-                    break
-
-                current_offset += self.page_size
-
-            return iter(all_records), {"offset": current_offset, "completed": True}
-
-        def _parse_rollup_entry(self, entry: dict, content: dict) -> dict:
-            """
-            Parse a rollup policy entry from the API response.
-
-            Args:
-                entry: The entry object from the response
-                content: The content object within the entry
-
-            Returns:
-                Parsed rollup policy record
-            """
-            index_name = entry.get("name") or content.get("index", "")
-
-            # Parse summaries if present
-            summaries = None
-            summaries_data = content.get("summaries")
-            if summaries_data and isinstance(summaries_data, dict):
-                summaries = []
-                for key, value in summaries_data.items():
-                    if isinstance(value, dict):
-                        summary = {
-                            "rollupIndex": value.get("rollupIndex", None),
-                            "span": value.get("span", None),
-                        }
-                        summaries.append(summary)
-
-            return {
-                "index": index_name,
-                "defaultAggregation": content.get("defaultAggregation", None),
-                "metricList": content.get("metricList", None),
-                "metricListType": content.get("metricListType", None),
-                "dimensionList": content.get("dimensionList", None),
-                "dimensionListType": content.get("dimensionListType", None),
-                "summaries": summaries,
-            }
+            # For snapshot tables, return completed offset
+            return iter(all_records), {"completed": True}
 
 
     ########################################################
