@@ -9,12 +9,12 @@ The Lakeflow Splunk Connector allows you to extract member, team, dashboard, and
 # Prerequisites
 
 - **Splunk account**: Access to a Splunk Enterprise or Splunk Cloud instance with the REST API enabled
-- **Splunk user credentials**: A user account with appropriate permissions
+- **Splunk API token**: A valid API token with appropriate permissions
   - Required Splunk capabilities:
     - `list_users` - For reading member/user information
     - `admin_all_objects` or specific permissions for reading dashboards and teams
     - `list_metrics_catalog` - For reading metrics catalog data
-- **Network access**: The environment running the connector must be able to reach your Splunk management port (default: 8089)
+- **Network access**: The environment running the connector must be able to reach your Splunk REST API endpoint
 - **Lakeflow / Databricks environment**: A workspace where you can register a Lakeflow community connector and run ingestion pipelines
 
 ## Setup
@@ -25,41 +25,45 @@ Provide the following **connection-level** options when configuring the connecto
 
 | Name | Type | Required | Description | Example |
 |------|------|----------|-------------|---------|
-| `host` | string | Yes | Splunk server hostname or IP address (without `https://` or port) | `prd-p-xxxxx.splunkcloud.com` |
-| `port` | integer | No | Splunk management port. Defaults to 8089 if not specified. | `8089` |
-| `username` | string | Yes | Splunk username with API access and `list_metrics_catalog` capability | `sc_admin` |
-| `password` | string | Yes | Password for the Splunk user. Store securely. | `your-password` |
-| `verify_ssl` | boolean | No | Whether to verify SSL certificates. Defaults to `false`. Set to `true` in production. | `false` |
+| `api_token` | string | Yes | SignalFx API token for authentication. Store securely using Databricks Secrets. | `eyJraWQ...` |
+| `base_url` | string | Yes | Full base URL for the SignalFx API. | `https://api.us1.signalfx.com/` |
+
+> **Note**: This connector uses token-based authentication for secure API access. The token should have the appropriate capabilities assigned (`list_users`, `admin_all_objects`, `list_metrics_catalog`).
 
 > **Note**: This connector does not currently require `externalOptionsAllowList` as it does not use table-specific options. All configuration is at the connection level.
 
 ### Obtaining the Required Parameters
 
-1. **Identify Your Splunk Server**
-   - **Splunk Enterprise**: Use your Splunk server's hostname or IP address (e.g., `splunk.mycompany.com`)
-   - **Splunk Cloud**: Use your cloud instance URL **without** the `https://` prefix (e.g., `prd-p-xxxxx.splunkcloud.com`)
-   - **Note**: Do NOT include `https://` in the host parameter - the connector adds this automatically
+1. **Generate a SignalFx API Token**
+   - Log in to your SignalFx account
+   - Navigate to **Settings** → **Organization Settings** → **Access Tokens**
+   - Click **New Token** and provide:
+     - Token name (e.g., "Databricks Lakeflow Connector")
+     - Select appropriate permissions/scopes for API access
+   - Ensure the token has the required permissions:
+     - Read access to members/users
+     - Read access to teams
+     - Read access to dashboards
+     - Read access to metrics catalog
+   - **Important**: Copy and save the token immediately - it will only be displayed once!
 
-2. **Obtain User Credentials**
-   - Log in to your Splunk instance as an admin
-   - Navigate to **Settings** → **Users and Authentication** → **Users**
-   - Create a new user or use an existing user with the required capabilities
-   - Ensure the user has the appropriate capabilities assigned through a role:
-     - `list_users` - To read user/member information
-     - `admin_all_objects` - To access dashboards and organizational data
-     - `list_metrics_catalog` - To read metrics catalog metadata
-   - Copy the username and password for use in the connection
+2. **Determine Your Base URL**
+   - Use the SignalFx API URL for your realm: `https://api.{REALM}.signalfx.com/`
+   - Common realms:
+     - **US1** (US East): `https://api.us1.signalfx.com/`
+     - **US2** (US West): `https://api.us2.signalfx.com/`
+     - **EU0** (Europe): `https://api.eu0.signalfx.com/`
+     - **JP0** (Japan): `https://api.jp0.signalfx.com/`
+   - Check your SignalFx organization settings to confirm your realm
 
 3. **Verify API Access**
-   - The Splunk REST API is typically available on port **8089**
    - Test connectivity using Postman:
      - **Method**: GET
-     - **URL**: `https://your-splunk-host:8089/services/server/info`
-     - **Authorization**: Basic Auth
-       - Username: `your-username`
-       - Password: `your-password`
-     - **Query Parameters** (optional): `output_mode=json`
-   - If successful, you should receive an XML/JSON response with server information
+     - **URL**: `https://api.{REALM}.signalfx.com/v2/organization`
+     - **Authorization**: Custom Header
+       - Header: `X-SF-TOKEN`
+       - Value: `your-api-token`
+   - If successful, you should receive a JSON response with organization information
 
 ### Create a Unity Catalog Connection
 
@@ -68,20 +72,27 @@ A Unity Catalog connection for this connector can be created in multiple ways:
 **Via Databricks UI:**
 1. Follow the **Lakeflow Community Connector** UI flow from the **"Add Data"** page
 2. Or navigate to **Catalog → Connections** and create a new **"Lakeflow Community Connector"** connection
-3. Fill in the connection parameters listed above (host, port, username, password, verify_ssl)
+3. Fill in the connection parameters listed above (`api_token`, `base_url`)
 4. Upload or reference the connector source code from this repository
 
 **Via Unity Catalog API:**
 The connection can also be created programmatically using the standard Unity Catalog API or SQL:
 ```sql
-CREATE CONNECTION my_splunk_connection
+CREATE CONNECTION my_signalfx_connection
 TYPE GENERIC_LAKEFLOW_CONNECT
 OPTIONS (
-  host = 'prd-p-xxxxx.splunkcloud.com',
-  port = '8089',
-  username = 'sc_admin',
-  password = 'your-password',
-  verify_ssl = 'false'
+  api_token = 'eyJraWQ...your-token...',
+  base_url = 'https://api.us1.signalfx.com/'
+);
+```
+
+**Using Databricks Secrets (Recommended for Production):**
+```sql
+CREATE CONNECTION my_signalfx_connection
+TYPE GENERIC_LAKEFLOW_CONNECT
+OPTIONS (
+  api_token = secret('my_scope', 'signalfx_api_token'),
+  base_url = 'https://api.us1.signalfx.com/'
 );
 ```
 
@@ -641,10 +652,13 @@ SELECT metric_name, index, dimensions FROM main.splunk_governance.splunk_metrics
   - For most environments, daily syncs are sufficient for members, teams, and metrics
   - Dashboards may benefit from more frequent syncs (every 6-12 hours) if your team actively develops dashboards
   - Schedule during off-peak hours if you have large datasets (1000+ users, 100+ dashboards, or 1000+ metrics)
-- **SSL Certificates**: 
-  - For development/testing: Set `verify_ssl: false` to work with self-signed certificates
-  - For production: Set `verify_ssl: true` and ensure proper SSL certificate validation
-- **Credential Security**: Use Databricks Secrets to store sensitive credentials instead of hardcoding them
+- **Token Security**: 
+  - **Always use Databricks Secrets** to store API tokens instead of hardcoding them
+  - Rotate tokens regularly for security
+  - Set token expiration times in Splunk for additional security
+- **SSL/TLS**: 
+  - Always use `https://` in your `base_url`
+  - Ensure valid SSL certificates for production environments
 - **Monitor Pipeline Health**: Set up alerts in Databricks Workflows to notify you of pipeline failures
 - **Data Quality**: Add data quality checks to ensure metrics catalog data meets your expectations
 
@@ -653,12 +667,13 @@ SELECT metric_name, index, dimensions FROM main.splunk_governance.splunk_metrics
 #### Common Issues
 
 **Authentication Errors (401)**
-- **Symptom**: `Splunk API authentication failed. Check username and password.`
+- **Symptom**: `Splunk API authentication failed. Check API token.`
 - **Solutions**:
-  - Verify username and password are correct in your Unity Catalog connection
-  - Ensure the user account is active and not locked in Splunk
-  - Check that credentials haven't expired
-  - Test with: `curl -k -u username:password https://your-host:8089/services/server/info`
+  - Verify the API token is correct in your Unity Catalog connection
+  - Ensure the token hasn't expired (check token expiration in Splunk)
+  - Confirm the token is still active (not revoked) in Splunk
+  - Verify the token user/service account is active and not locked
+  - Test authentication using Postman with Bearer Token authorization
 
 **Access Forbidden (403)**
 - **Symptom**: `Splunk API access forbidden. Ensure user has required capabilities`
@@ -675,23 +690,23 @@ SELECT metric_name, index, dimensions FROM main.splunk_governance.splunk_metrics
 **Connection Errors / Timeouts**
 - **Symptom**: `Connection refused` or `Timeout` errors
 - **Solutions**:
-  - Verify the Splunk `host` parameter is correct (without `https://`)
-  - Confirm the `port` is correct (default: 8089)
-  - Ensure network connectivity from Databricks to Splunk management port
+  - Verify the `base_url` parameter is correct: `https://api.{REALM}.signalfx.com/`
+  - Confirm your SignalFx realm (US1, US2, EU0, JP0)
+  - Ensure network connectivity from Databricks to SignalFx API endpoint
   - Check firewall rules allow traffic from your Databricks workspace IPs
-  - For Splunk Cloud, verify your instance URL is correct
+  - Verify your SignalFx realm URL is correct
   - Test connectivity using Postman:
     - **Method**: GET
-    - **URL**: `https://your-host:8089/services/server/info`
-    - **Authorization**: Basic Auth (username + password)
-    - Disable SSL verification if using self-signed certificates
+    - **URL**: `https://api.{REALM}.signalfx.com/v2/organization`
+    - **Header**: `X-SF-TOKEN: your-api-token`
 
 **SSL Certificate Errors**
 - **Symptom**: SSL verification failures
 - **Solutions**:
-  - For self-signed certificates, set `verify_ssl: false` in the connection
-  - For production, ensure valid SSL certificates are installed on Splunk
-  - For Splunk Cloud, `verify_ssl: true` should work by default
+  - Ensure the `base_url` uses `https://` protocol
+  - For self-signed certificates, you may need to configure your Databricks workspace to trust the certificate
+  - For Splunk Cloud, SSL should work by default with valid certificates
+  - Verify the certificate is not expired
 
 **Empty Results / No Data**
 - **Symptom**: Tables created but contain 0 rows
@@ -707,7 +722,7 @@ SELECT metric_name, index, dimensions FROM main.splunk_governance.splunk_metrics
     - **Method**: GET
     - **URL**: `https://host:8089/services/authentication/users?output_mode=json` (for members)
     - **URL**: `https://host:8089/services/catalog/metricstore/metrics?output_mode=json` (for metrics)
-    - **Authorization**: Basic Auth
+    - **Authorization**: Bearer Token
 
 **TypeError: Object of type ellipsis is not JSON serializable**
 - **Symptom**: Error when running the pipeline with `...` in the error message
@@ -744,33 +759,30 @@ The connector includes built-in error handling for common scenarios including au
    **Test Members Endpoint:**
    - **Method**: GET
    - **URL**: `https://host:8089/services/authentication/users?output_mode=json`
-   - **Authorization**: Basic Auth
-     - Username: `your-username`
-     - Password: `your-password`
+   - **Authorization**: Bearer Token
+     - Token: `your-api-token`
    
    **Test Teams Endpoint:**
    - **Method**: GET
    - **URL**: `https://host:8089/services/authorization/roles?output_mode=json`
-   - **Authorization**: Basic Auth
-     - Username: `your-username`
-     - Password: `your-password`
+   - **Authorization**: Bearer Token
+     - Token: `your-api-token`
    
    **Test Dashboards Endpoint:**
    - **Method**: GET
    - **URL**: `https://host:8089/services/data/ui/views?output_mode=json`
-   - **Authorization**: Basic Auth
-     - Username: `your-username`
-     - Password: `your-password`
+   - **Authorization**: Bearer Token
+     - Token: `your-api-token`
    
    **Test Metrics Endpoint:**
    - **Method**: GET
    - **URL**: `https://host:8089/services/catalog/metricstore/metrics?output_mode=json`
-   - **Authorization**: Basic Auth
-     - Username: `your-username`
-     - Password: `your-password`
+   - **Authorization**: Bearer Token
+     - Token: `your-api-token`
    
    **Postman Settings:**
-   - Disable SSL certificate verification for self-signed certificates: **Settings** → **General** → Turn off "SSL certificate verification"
+   - Use **Bearer Token** in the Authorization tab
+   - Add header: `Authorization: Bearer your-api-token`
    - Add `count=10` query parameter to limit results for testing
 
 3. Start with one table (e.g., `members` or `metrics`) to isolate issues
