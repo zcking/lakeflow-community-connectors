@@ -1,5 +1,0 @@
-[console_scripts]
-community-connector = databricks.labs.community_connector.cli:main
-
-[databricks.labs]
-community_connector = databricks.labs.community_connector
