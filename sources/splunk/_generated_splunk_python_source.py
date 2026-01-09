@@ -223,7 +223,7 @@ def register_lakeflow_source(spark):
                     - base_url: SignalFx API base URL (default: https://api.us1.signalfx.com)
             """
             self.api_token = options.get("api_token")
-            self.base_url = options.get("base_url", "https://api.us1.signalfx.com")
+            self.base_url = options.get("base_url")
 
             if not self.api_token:
                 raise ValueError("Missing required option: 'api_token'")
