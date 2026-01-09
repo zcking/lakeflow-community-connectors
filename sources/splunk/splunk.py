@@ -58,7 +58,7 @@ class LakeflowConnect:
         """
         return ["metrics", "dimensions", "rollup_policies"]
 
-    def get_table_schema(self, table_name: str) -> StructType:
+    def get_table_schema(self, table_name: str, table_options: dict[str, str] = {}) -> StructType:
         """
         Fetch the schema of a table.
 
@@ -121,7 +121,7 @@ class LakeflowConnect:
 
         return schemas[table_name]
 
-    def read_table_metadata(self, table_name: str) -> dict:
+    def read_table_metadata(self, table_name: str, table_options: dict[str, str] = {}) -> dict:
         """
         Fetch the metadata of a table.
 
@@ -134,15 +134,15 @@ class LakeflowConnect:
         """
         metadata = {
             "metrics": {
-                "primary_key": "metric_name",
+                "primary_keys": ["metric_name"],
                 "ingestion_type": "snapshot",
             },
             "dimensions": {
-                "primary_key": "dimension_name",
+                "primary_keys": ["dimension_name"],
                 "ingestion_type": "snapshot",
             },
             "rollup_policies": {
-                "primary_key": "index",
+                "primary_keys": ["index"],
                 "ingestion_type": "snapshot",
             },
         }
@@ -152,7 +152,7 @@ class LakeflowConnect:
 
         return metadata[table_name]
 
-    def read_table(self, table_name: str, start_offset: dict) -> tuple[Iterator[dict], dict]:
+    def read_table(self, table_name: str, start_offset: dict, table_options: dict[str, str] = {}) -> tuple[Iterator[dict], dict]:
         """
         Read the records of a table and return an iterator of records and an offset.
 

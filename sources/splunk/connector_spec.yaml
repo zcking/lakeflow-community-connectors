@@ -12,8 +12,8 @@ connection:
       type: string
       required: true
       description: >
-        Splunk server hostname or IP address (without protocol or port).
-        For Splunk Enterprise, use your server's hostname or IP address.
+        Splunk server hostname or IP address (without https:// prefix).
+        For Splunk Enterprise, use your server's hostname or IP.
         For Splunk Cloud, use your cloud instance URL
         (e.g., prd-p-xxxxx.splunkcloud.com).
 
@@ -56,7 +56,4 @@ connection:
 # Use a comma-separated string of option names.
 # If no table-specific options are needed, set to empty string or omit.
 # ============================================================================
-# NOTE: Currently empty because the connector does not yet use table_options.
-# Future enhancements will add filtering options for: index, metric_name,
-# dimension, dimension_value, app, earliest_time, latest_time, search_query
 external_options_allowlist: ""
