@@ -44,9 +44,9 @@ class LakeflowConnect:
         Returns a list of available tables from the SignalFx API.
 
         Returns:
-            List of table names: members, teams, dashboards
+            List of table names: members, teams, dashboards, metrics
         """
-        return ["members", "teams", "dashboards"]
+        return ["members", "teams", "dashboards", "metrics"]
 
     def get_table_schema(self, table_name: str, table_options: dict[str, str] = {}) -> StructType:
         """
@@ -101,6 +101,16 @@ class LakeflowConnect:
                     StructField("eventOverlays", StringType(), True),
                 ]
             ),
+            "metrics": StructType(
+                [
+                    StructField("name", StringType(), False),
+                    StructField("type", StringType(), True),
+                    StructField("description", StringType(), True),
+                    StructField("created", LongType(), True),
+                    StructField("lastUpdated", LongType(), True),
+                    StructField("creator", StringType(), True),
+                ]
+            ),
         }
 
         if table_name not in schemas:
@@ -133,6 +143,10 @@ class LakeflowConnect:
                 "primary_keys": ["id"],
                 "ingestion_type": "snapshot",
             },
+            "metrics": {
+                "primary_keys": ["name"],
+                "ingestion_type": "snapshot",
+            },
         }
 
         if table_name not in metadata:
@@ -158,6 +172,8 @@ class LakeflowConnect:
             return self._read_teams(start_offset)
         elif table_name == "dashboards":
             return self._read_dashboards(start_offset)
+        elif table_name == "metrics":
+            return self._read_metrics(start_offset)
         else:
             raise ValueError(f"Table '{table_name}' is not supported.")
 
@@ -299,6 +315,38 @@ class LakeflowConnect:
                 "groupId": dashboard.get("groupId"),
                 "tags": dashboard.get("tags"),
                 "eventOverlays": dashboard.get("eventOverlays"),
+            }
+            all_records.append(record)
+
+        # For snapshot tables, return completed offset
+        return iter(all_records), {"completed": True}
+
+    def _read_metrics(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
+        """
+        Read metrics from SignalFx API.
+
+        Args:
+            start_offset: Offset containing pagination info (not used for full refresh)
+
+        Returns:
+            Iterator of metric records and next offset
+        """
+        all_records = []
+
+        # Call the SignalFx metrics API endpoint
+        data = self._make_request("/v2/metric")
+        
+        # The API returns a list of metric objects
+        metrics = data if isinstance(data, list) else data.get("results", [])
+
+        for metric in metrics:
+            record = {
+                "name": metric.get("name"),
+                "type": metric.get("type"),
+                "description": metric.get("description"),
+                "created": metric.get("created"),
+                "lastUpdated": metric.get("lastUpdated"),
+                "creator": metric.get("creator"),
             }
             all_records.append(record)
 
