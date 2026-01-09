@@ -64,17 +64,17 @@ class LakeflowConnect:
                 [
                     StructField("id", StringType(), False),
                     StructField("organizationId", StringType(), False),
-                    StructField("name", StringType(), True),
-                    StructField("email", StringType(), True),
                     StructField("fullName", StringType(), True),
+                    StructField("email", StringType(), True),
                     StructField("created", LongType(), True),
                     StructField("lastUpdated", LongType(), True),
                     StructField("admin", BooleanType(), True),
                     StructField("readOnly", BooleanType(), True),
-                    StructField("creator", BooleanType(), True),
-                    StructField("description", BooleanType(), True),
-                    StructField("title", BooleanType(), True),
-                    StructField("roles", BooleanType(), True),
+                    StructField("creator", StringType(), True),
+                    StructField("title", StringType(), True),
+                    StructField("roles", StringType(), True),
+                    StructField("title_description", StringType(), True),
+                    StructField("role_description", StringType(), True),
                 ]
             ),
             "teams": StructType(
@@ -197,17 +197,17 @@ class LakeflowConnect:
             record = {
                 "id": member.get("id"),
                 "organizationId": member.get("organizationId"),
-                "name": member.get("name"),
-                "email": member.get("email"),
                 "fullName": member.get("fullName"),
+                "email": member.get("email"),
                 "created": member.get("created"),
                 "lastUpdated": member.get("lastUpdated"),
                 "admin": member.get("admin", False),
                 "readOnly": member.get("readOnly", False),
-                "creator": member.get("creator", False),
-                "description": member.get("description", False),
-                "title": member.get("title", False),
-                "roles": member.get("roles", False),
+                "creator": member.get("creator"),
+                "title": member.get("title"),
+                "roles": member.get("roles"),
+                "title_description": member.get("roles.title"),
+                "role_description": member.get("roles.description"),
             }
             all_records.append(record)
 
