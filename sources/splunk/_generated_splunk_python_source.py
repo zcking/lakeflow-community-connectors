@@ -279,6 +279,7 @@ def register_lakeflow_source(spark):
                     [
                         StructField("id", StringType(), False),
                         StructField("name", StringType(), True),
+                        StructField("members", StringType(), True),
                         StructField("description", StringType(), True),
                         StructField("created", LongType(), True),
                         StructField("lastUpdated", LongType(), True),
@@ -432,6 +433,7 @@ def register_lakeflow_source(spark):
                 record = {
                     "id": team.get("id"),
                     "name": team.get("name"),
+                    "members": team.get("members"),
                     "description": team.get("description"),
                     "created": team.get("created"),
                     "lastUpdated": team.get("lastUpdated"),

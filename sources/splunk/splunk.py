@@ -196,6 +196,7 @@ class LakeflowConnect:
         for member in members:
             record = {
                 "id": member.get("id"),
+                "organizationId": member.get("organizationId"),
                 "name": member.get("name"),
                 "email": member.get("email"),
                 "fullName": member.get("fullName"),
