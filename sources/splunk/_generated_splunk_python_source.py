@@ -410,143 +410,179 @@ def register_lakeflow_source(spark):
 
         def _read_members(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
             """
-            Read organization members from SignalFx API.
+            Read organization members from SignalFx API with pagination.
 
             Args:
-                start_offset: Offset containing pagination info (not used for full refresh)
+                start_offset: Offset containing pagination info
 
             Returns:
                 Iterator of member records and next offset
             """
             all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
 
-            # Call the SignalFx members API endpoint
-            data = self._make_request("/v2/organization/member")
+            while True:
+                # Call the SignalFx members API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/organization/member", params)
 
-            # The API returns a list of member objects
-            members = data if isinstance(data, list) else data.get("results", [])
+                # The API returns a list of member objects
+                members = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(members)) if isinstance(data, dict) else len(members)
 
-            for member in members:
-                record = {
-                    "id": member.get("id"),
-                    "organizationId": member.get("organizationId"),
-                    "fullName": member.get("fullName"),
-                    "email": member.get("email"),
-                    "created": member.get("created"),
-                    "lastUpdated": member.get("lastUpdated"),
-                    "admin": member.get("admin", False),
-                    "readOnly": member.get("readOnly", False),
-                    "creator": member.get("creator"),
-                    "title": member.get("title"),
-                    "roles": member.get("roles"),
-                    "title_description": member.get("roles.title"),
-                    "role_description": member.get("roles.description"),
-                }
-                all_records.append(record)
+                for member in members:
+                    record = {
+                        "id": member.get("id"),
+                        "organizationId": member.get("organizationId"),
+                        "fullName": member.get("fullName"),
+                        "email": member.get("email"),
+                        "created": member.get("created"),
+                        "lastUpdated": member.get("lastUpdated"),
+                        "admin": member.get("admin", False),
+                        "readOnly": member.get("readOnly", False),
+                        "creator": member.get("creator"),
+                        "title": member.get("title"),
+                        "roles": member.get("roles"),
+                        "title_description": member.get("roles.title"),
+                        "role_description": member.get("roles.description"),
+                    }
+                    all_records.append(record)
+
+                # Check if we've fetched all records
+                if not members or len(members) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(members)
 
             # For snapshot tables, return completed offset
             return iter(all_records), {"completed": True}
 
         def _read_teams(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
             """
-            Read teams from SignalFx API.
+            Read teams from SignalFx API with pagination.
 
             Args:
-                start_offset: Offset containing pagination info (not used for full refresh)
+                start_offset: Offset containing pagination info
 
             Returns:
                 Iterator of team records and next offset
             """
             all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
 
-            # Call the SignalFx teams API endpoint
-            data = self._make_request("/v2/team")
+            while True:
+                # Call the SignalFx teams API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/team", params)
 
-            # The API returns a list of team objects
-            teams = data if isinstance(data, list) else data.get("results", [])
+                # The API returns a list of team objects
+                teams = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(teams)) if isinstance(data, dict) else len(teams)
 
-            for team in teams:
-                record = {
-                    "id": team.get("id"),
-                    "name": team.get("name"),
-                    "members": team.get("members"),
-                    "description": team.get("description"),
-                    "created": team.get("created"),
-                    "lastUpdated": team.get("lastUpdated"),
-                    "creator": team.get("creator"),
-                }
-                all_records.append(record)
+                for team in teams:
+                    record = {
+                        "id": team.get("id"),
+                        "name": team.get("name"),
+                        "members": team.get("members"),
+                        "description": team.get("description"),
+                        "created": team.get("created"),
+                        "lastUpdated": team.get("lastUpdated"),
+                        "creator": team.get("creator"),
+                    }
+                    all_records.append(record)
+
+                # Check if we've fetched all records
+                if not teams or len(teams) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(teams)
 
             # For snapshot tables, return completed offset
             return iter(all_records), {"completed": True}
 
         def _read_dashboards(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
             """
-            Read dashboards from SignalFx API.
+            Read dashboards from SignalFx API with pagination.
 
             Args:
-                start_offset: Offset containing pagination info (not used for full refresh)
+                start_offset: Offset containing pagination info
 
             Returns:
                 Iterator of dashboard records and next offset
             """
             all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
 
-            # Call the SignalFx dashboards API endpoint
-            data = self._make_request("/v2/dashboard")
+            while True:
+                # Call the SignalFx dashboards API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/dashboard", params)
 
-            # The API returns a list of dashboard objects
-            dashboards = data if isinstance(data, list) else data.get("results", [])
+                # The API returns a list of dashboard objects
+                dashboards = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(dashboards)) if isinstance(data, dict) else len(dashboards)
 
-            for dashboard in dashboards:
-                # Convert tags list to comma-separated string if present
-                tags = dashboard.get("tags", [])
-                tags_str = ",".join(tags) if isinstance(tags, list) else tags
+                for dashboard in dashboards:
+                    record = {
+                        "id": dashboard.get("id"),
+                        "name": dashboard.get("name"),
+                        "description": dashboard.get("description"),
+                        "created": dashboard.get("created"),
+                        "lastUpdated": dashboard.get("lastUpdated"),
+                        "creator": dashboard.get("creator"),
+                        "groupId": dashboard.get("groupId"),
+                        "tags": dashboard.get("tags"),
+                        "eventOverlays": dashboard.get("eventOverlays"),
+                    }
+                    all_records.append(record)
 
-                record = {
-                    "id": dashboard.get("id"),
-                    "name": dashboard.get("name"),
-                    "description": dashboard.get("description"),
-                    "created": dashboard.get("created"),
-                    "lastUpdated": dashboard.get("lastUpdated"),
-                    "creator": dashboard.get("creator"),
-                    "groupId": dashboard.get("groupId"),
-                    "tags": dashboard.get("tags"),
-                    "eventOverlays": dashboard.get("eventOverlays"),
-                }
-                all_records.append(record)
+                # Check if we've fetched all records
+                if not dashboards or len(dashboards) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(dashboards)
 
             # For snapshot tables, return completed offset
             return iter(all_records), {"completed": True}
 
         def _read_metrics(self, start_offset: dict) -> tuple[Iterator[dict], dict]:
             """
-            Read metrics from SignalFx API.
+            Read metrics from SignalFx API with pagination.
 
             Args:
-                start_offset: Offset containing pagination info (not used for full refresh)
+                start_offset: Offset containing pagination info
 
             Returns:
                 Iterator of metric records and next offset
             """
             all_records = []
+            offset = start_offset.get("offset", 0) if start_offset else 0
 
-            # Call the SignalFx metrics API endpoint
-            data = self._make_request("/v2/metric")
+            while True:
+                # Call the SignalFx metrics API endpoint with pagination
+                params = {"offset": offset, "limit": self.page_size}
+                data = self._make_request("/v2/metric", params)
 
-            # The API returns a list of metric objects
-            metrics = data if isinstance(data, list) else data.get("results", [])
+                # The API returns a list of metric objects
+                metrics = data if isinstance(data, list) else data.get("results", [])
+                count = data.get("count", len(metrics)) if isinstance(data, dict) else len(metrics)
 
-            for metric in metrics:
-                record = {
-                    "name": metric.get("name"),
-                    "type": metric.get("type"),
-                    "description": metric.get("description"),
-                    "created": metric.get("created"),
-                    "lastUpdated": metric.get("lastUpdated"),
-                    "creator": metric.get("creator"),
-                }
-                all_records.append(record)
+                for metric in metrics:
+                    record = {
+                        "name": metric.get("name"),
+                        "type": metric.get("type"),
+                        "description": metric.get("description"),
+                        "created": metric.get("created"),
+                        "lastUpdated": metric.get("lastUpdated"),
+                        "creator": metric.get("creator"),
+                    }
+                    all_records.append(record)
+
+                # Check if we've fetched all records
+                if not metrics or len(metrics) < self.page_size or len(all_records) >= count:
+                    break
+
+                offset += len(metrics)
 
             # For snapshot tables, return completed offset
             return iter(all_records), {"completed": True}
