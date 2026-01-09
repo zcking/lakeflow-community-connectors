@@ -1,8 +1,4 @@
 {
-  "host": "https://changeme.splunkcloud.com",
-  "port": 8089,
-  "username": "",
-  "password": "",
-  "verify_ssl": false
+  "api_token": "",
+  "base_url": ""
 }
-
