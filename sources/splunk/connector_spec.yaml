@@ -1,4 +1,4 @@
-# splunk Community Connector Spec
+# SignalFx Community Connector Spec
 # This file defines the specification for the connector including
 # connection parameters and allowlist options.
 
@@ -8,46 +8,22 @@
 # ============================================================================
 connection:
   parameters:
-    - name: host
+    - name: api_token
       type: string
       required: true
       description: >
-        Splunk server hostname or IP address (without https:// prefix).
-        For Splunk Enterprise, use your server's hostname or IP.
-        For Splunk Cloud, use your cloud instance URL
-        (e.g., prd-p-xxxxx.splunkcloud.com).
+        SignalFx API token for authentication. Generate this from your SignalFx
+        account settings under Organization Settings > Access Tokens. Store
+        securely and use appropriate access controls. For production, consider
+        using Databricks secrets.
 
-    - name: port
-      type: integer
+    - name: base_url
+      type: string
       required: false
       description: >
-        Splunk management port for REST API access. Defaults to 8089 if not
-        specified. The standard management port is 8089 for most Splunk
-        installations.
-
-    - name: username
-      type: string
-      required: true
-      description: >
-        Splunk username with appropriate permissions for API access. The user
-        must have the 'list_metrics_catalog' capability assigned through a role
-        to access metrics catalog endpoints.
-
-    - name: password
-      type: string
-      required: true
-      description: >
-        Password for the Splunk user account. Store securely and use appropriate
-        access controls. For production, consider using Databricks secrets.
-
-    - name: verify_ssl
-      type: boolean
-      required: false
-      description: >
-        Whether to verify SSL certificates when connecting to Splunk. Defaults
-        to false. Set to true in production environments with valid SSL
-        certificates. Use false for development or when using self-signed
-        certificates.
+        SignalFx API base URL. Defaults to https://api.us1.signalfx.com if not
+        specified. Change this if you're using a different SignalFx realm
+        (e.g., api.eu0.signalfx.com for EU, api.us2.signalfx.com for US2).
 
 # ============================================================================
 # External Options Allowlist
