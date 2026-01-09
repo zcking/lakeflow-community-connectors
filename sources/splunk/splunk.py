@@ -63,7 +63,7 @@ class LakeflowConnect:
             "members": StructType(
                 [
                     StructField("id", StringType(), False),
-                    StructField("organizationId", StringType(), False),
+                    StructField("organizationId", StringType(), True),
                     StructField("fullName", StringType(), True),
                     StructField("email", StringType(), True),
                     StructField("created", LongType(), True),
